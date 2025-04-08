@@ -1,7 +1,0 @@
-/swagger-ui.html
-/distv2/index.html
-/doc.html
-/api-docs
-/v2/api-docs
-/api.html
-/dwr

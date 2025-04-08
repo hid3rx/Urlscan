@@ -1,6 +1,7 @@
-import requests, urllib3, argparse, traceback, random, time, os
+import requests, urllib3, argparse, traceback, random, time, os, threading
 from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
 from concurrent import futures
+from datetime import datetime
 
 # 禁用https警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -22,11 +23,7 @@ WORDLISTS = []
 
 # 字典路径，读取后储存到 WORDLISTS 中
 WORDLISTS_PATH = [
-    "dicts/java.txt",
-    "dicts/api.txt",
-    "dicts/admin.txt",
     "dicts/common.txt",
-    "dicts/backup.txt", # 可能会被WAF封禁
     "dicts/leak.txt", # 可能会被WAF封禁
 ]
 
@@ -34,7 +31,7 @@ WORDLISTS_PATH = [
 STATUS_CODE_EXCLUDED = [ 404, ]
 
 # 线程并发数
-THREADS = 1
+THREADS = 10
 
 # 每个线程发起登录后暂停时长，单位秒
 DELAY = 1
@@ -56,6 +53,22 @@ for wordlists in WORDLISTS_PATH:
     except Exception as e:
         print(f"[x] Cannot open '{wordlists}' file {e}")
         os._exit(0)
+
+#
+# =================== [ 扫描日志 ] ===================
+#
+
+LOG_OUTPUT_PATH = "log.txt"
+LOG_OUTPUT_LOCK = threading.Lock() # 文件互斥锁
+
+with open(LOG_OUTPUT_PATH, "a", encoding="utf-8") as fout:
+    fout.write(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+# 写入文件函数，末尾的换行符需要自行处理
+def write_to_file(path: str, lock, text: str):
+    with lock:
+        with open(path, "a", encoding="utf-8") as fout:
+            fout.write(text)
 
 #
 # =================== [ 扫描函数 ] ===================
@@ -80,12 +93,16 @@ def run(url):
     time.sleep(DELAY)
 
     try:
+        # 发起请求
         response = requests.get(url, verify=False, headers=HEADERS, 
             allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
+        # 输出
         if response.status_code not in STATUS_CODE_EXCLUDED:
-            print(f"{url}\t\t\t{response.status_code} {len(response.content)}")
+            output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
+            print(f"[+] {output}")
+            write_to_file(LOG_OUTPUT_PATH, LOG_OUTPUT_LOCK, f"{output}\n")
     except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
-        print(f"{url}\t\tconnect error")
+        print(f"[x] {url}\t\tconnect error")
     except Exception as e:
         print(f"[x] {url}\t\t遇到未知错误 {e} 详细信息如下：")
         print(traceback.format_exc())

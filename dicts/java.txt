@@ -1,8 +1,0 @@
-/actuator
-/actuator/env
-/env
-/jolokia
-/hystrix.stream 
-/functionRouter
-/druid/login.html
-/eureka

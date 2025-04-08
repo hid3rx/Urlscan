@@ -1,4 +1,0 @@
-/bin.zip
-/bin.rar
-/web.zip
-/web.rar
