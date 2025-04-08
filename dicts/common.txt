@@ -1,0 +1,11 @@
+/nacos/v1
+/console
+/snapshots
+/graph
+/v2/keys
+/version
+/artemis-portal/artemis/env
+/WebReport/ReportServer
+/webroot/decision/login
+/phpmyadmin
+/adminer
