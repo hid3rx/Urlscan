@@ -1,4 +1,4 @@
-import requests, urllib3, argparse, traceback, random, time
+import requests, urllib3, argparse, traceback, random, time, os
 from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
 from concurrent import futures
 
@@ -81,7 +81,7 @@ def run(url):
 
     try:
         response = requests.get(url, verify=False, headers=HEADERS, 
-            allow_redirects=False, timeout=5, proxies=PROXIES if USE_PROXY else None)
+            allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
         if response.status_code not in STATUS_CODE_EXCLUDED:
             print(f"{url}\t\t\t{response.status_code} {len(response.content)}")
     except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
@@ -156,11 +156,16 @@ def generate_urls(target):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='URL scan')
-    parser.add_argument("target", help="URL Target")
+    parser.add_argument("target", help="URL target or file")
     args = parser.parse_args()
     if args.target:
         # 生成探测列表
-        URLS_QUEUE = generate_urls(args.target)
+        if os.path.exists(args.target):
+            with open(args.target, "r", encoding="utf-8") as f:
+                for target in f.readlines():
+                    URLS_QUEUE.extend(generate_urls(target.rstrip()))
+        else:
+            URLS_QUEUE = generate_urls(args.target)
 
         # 多线程扫描
         with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
