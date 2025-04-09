@@ -17,6 +17,9 @@
 /api-docs
 /api.html
 /api.json
+/apisix/admin
+/apisix/admin/user/login
+/apisix/plugin/jwt/sign?key=test-key
 /artemis-portal/artemis/env
 /config.json
 /console
@@ -29,6 +32,7 @@
 /fckeditor
 /functionRouter
 /graph
+/graphql
 /hystrix.stream 
 /jeecg-boot
 /jenkins
@@ -76,6 +80,7 @@
 /upload.jsp
 /user/list
 /users/list
+/user/login
 /v2/api-docs
 /v2/keys
 /version
