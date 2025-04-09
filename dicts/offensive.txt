@@ -3,7 +3,7 @@
 /.svn
 /.env
 /.idea
-/../../../../../../../etc/hosts
+/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/etc/hosts
 /.bash_history
 /.bash_logout
 /.bash_profile
