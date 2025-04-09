@@ -23,12 +23,12 @@ WORDLISTS = []
 
 # 字典路径，读取后储存到 WORDLISTS 中
 WORDLISTS_PATH = [
-    "dicts/common.txt",
-    "dicts/leak.txt", # 可能会被WAF封禁
+    "dicts/common.txt", # 常规路径扫描
+    "dicts/offensive.txt", # 进攻性路径扫描，可能会被WAF封禁
 ]
 
-# 排除的响应码
-STATUS_CODE_EXCLUDED = [ 404, ]
+# 403绕过后缀，直接拼接在请求的URL后面，如：http://example.com/doc.html;.js
+BYPASS_403_SUFFIX = [";", ";.js", "/..;/"]
 
 # 线程并发数
 THREADS = 10
@@ -92,17 +92,24 @@ def run(url):
 
     time.sleep(DELAY)
 
+    # urls = [url + (url with 403 bypass suffix)]
+    urls = [
+        url,
+        *[url+s for s in BYPASS_403_SUFFIX]
+    ]
+
     try:
-        # 发起请求
-        response = requests.get(url, verify=False, headers=HEADERS, 
-            allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
-        # 输出
-        if response.status_code not in STATUS_CODE_EXCLUDED:
-            output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
-            print(f"[+] {output}")
-            write_to_file(LOG_OUTPUT_PATH, LOG_OUTPUT_LOCK, f"{output}\n")
+        for idx, url in enumerate(urls):
+            response = requests.get(url, verify=False, headers=HEADERS, 
+                allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
+            if response.status_code != 404:
+                output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
+                print(f"[+] {output}")
+                write_to_file(LOG_OUTPUT_PATH, LOG_OUTPUT_LOCK, f"{output}\n")
+            if idx == 0 and response.status_code != 403:
+                break
     except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
-        print(f"[x] {url}\t\tconnect error")
+        print(f"[x] {url}\t\tConnect error")
     except Exception as e:
         print(f"[x] {url}\t\t遇到未知错误 {e} 详细信息如下：")
         print(traceback.format_exc())

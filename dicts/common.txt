@@ -10,6 +10,10 @@
 /admin.jsp
 /adminer
 /admin/login.html
+/api
+/api/v1
+/api/v2
+/api/v2/api-docs
 /api-docs
 /api.html
 /api.json
@@ -49,6 +53,7 @@
 /register.html
 /register.jsp
 /robots.txt
+/role/list
 /snapshots
 /src
 /swagger-ui.html
@@ -69,6 +74,8 @@
 /upload.htm
 /upload.html
 /upload.jsp
+/user/list
+/users/list
 /v2/api-docs
 /v2/keys
 /version
