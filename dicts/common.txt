@@ -49,6 +49,7 @@
 /nacos/v1
 /net
 /phpmyadmin
+/prod-api/
 /register
 /register.asp
 /register.aspx

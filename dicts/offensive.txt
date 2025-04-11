@@ -16,3 +16,4 @@
 /bin.rar
 /web.zip
 /web.rar
+/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/%2E%2E/etc/hosts

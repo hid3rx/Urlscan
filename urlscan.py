@@ -10,10 +10,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # =================== [ 全局设置 ] ===================
 #
 
-# 待扫描的URL列表
+# 待扫描队列，由 generate_urls 函数生成
 URLS_QUEUE = []
 
-# 待扫描的URL列表，如：
+# 待扫描的URL路径，从 WORDLISTS_PATH 中读取，如：
 # [
 #     "/actuator",
 #     "/doc.html",
@@ -27,13 +27,10 @@ WORDLISTS_PATH = [
     "dicts/offensive.txt", # 进攻性路径扫描，可能会被WAF封禁
 ]
 
-# 403绕过后缀，直接拼接在请求的URL后面，如：http://example.com/doc.html;.js
-BYPASS_403_SUFFIX = [";", ";.js", "/..;/"]
-
 # 线程并发数
 THREADS = 10
 
-# 每个线程发起登录后暂停时长，单位秒
+# 每个线程发起请求后暂停时长，单位秒
 DELAY = 1
 
 # 是否使用代理
@@ -58,14 +55,11 @@ for wordlists in WORDLISTS_PATH:
 # =================== [ 扫描日志 ] ===================
 #
 
-LOG_OUTPUT_PATH = "log.txt"
-LOG_OUTPUT_LOCK = threading.Lock() # 文件互斥锁
+LOG_PATH = "log.txt"
+LOG_LOCK = threading.Lock() # 文件互斥锁
 
-with open(LOG_OUTPUT_PATH, "a", encoding="utf-8") as fout:
-    fout.write(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-
-# 写入文件函数，末尾的换行符需要自行处理
-def write_to_file(path: str, lock, text: str):
+# 写入日志，末尾的换行符需要自行处理
+def log(path: str, lock, text: str):
     with lock:
         with open(path, "a", encoding="utf-8") as fout:
             fout.write(text)
@@ -74,44 +68,44 @@ def write_to_file(path: str, lock, text: str):
 # =================== [ 扫描函数 ] ===================
 #
 
-HEADERS = requests.utils.default_headers()
-HEADERS.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0",
-    "Connection": "close",
-})
-
 def run(url):
-    IP = ".".join(str(random.randint(0,255)) for _ in range(4))
-    HEADERS.update({
-        "X-Forwarded-For": IP,
-        "X-Originating-IP": IP,
-        "X-Remote-IP": IP,
-        "X-Remote-Addr": IP,
-        "X-Real-IP": IP
-    })
-
     time.sleep(DELAY)
 
-    # urls = [url + (url with 403 bypass suffix)]
+    # 伪造 XFF
+    random_ip = ".".join(str(random.randint(0,255)) for _ in range(4))
+    headers = requests.utils.default_headers()
+    headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0",
+        "Connection": "close",
+        "X-Forwarded-For": random_ip,
+        "X-Originating-IP": random_ip,
+        "X-Remote-IP": random_ip,
+        "X-Remote-Addr": random_ip,
+        "X-Real-IP": random_ip
+    })
+
+    # 403 Bypass
     urls = [
         url,
-        *[url+s for s in BYPASS_403_SUFFIX]
+        url + ";",
+        url + ";.js",
+        url + "/..;/",
     ]
 
     try:
         for idx, url in enumerate(urls):
-            response = requests.get(url, verify=False, headers=HEADERS, 
+            response = requests.get(url, verify=False, headers=headers, 
                 allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
             if response.status_code != 404:
                 output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
                 print(f"[+] {output}")
-                write_to_file(LOG_OUTPUT_PATH, LOG_OUTPUT_LOCK, f"{output}\n")
+                log(LOG_PATH, LOG_LOCK, f"{output}\n")
             if idx == 0 and response.status_code != 403:
                 break
     except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
-        print(f"[x] {url}\t\tConnect error")
+        print(f"[x] {url}\tConnect error")
     except Exception as e:
-        print(f"[x] {url}\t\t遇到未知错误 {e} 详细信息如下：")
+        print(f"[x] {url}\tAn unknown error occurred: {e}")
         print(traceback.format_exc())
 
 #
@@ -157,7 +151,7 @@ def generate_urls(target):
         for i in range(len(path) + 1):
             paths.append("/".join(path[0:i]))
 
-    # 将第一部分和第二部分交叉组合，urls = [
+    # 将第一部分和第二部分组合，urls = [
     #     "https://example.com:8443",
     #     "https://example.com:8443/api",
     #     "https://example.com:8443/api/login"
@@ -166,20 +160,26 @@ def generate_urls(target):
     for path in paths:
         urls.append(f"{url}/{path}")
 
-    # 将组合结果再与字典拼接，urls_queue = []
+    # 将组合结果再与字典拼接，urls_queue = [
+    #     "https://example.com:8443/actuator",
+    #     "https://example.com:8443/api/actuator",
+    #     "https://example.com:8443/api/login/actuator"
+    # ]
     urls_queue = []
     for url in urls:
         url = url.rstrip("/")
         for path in WORDLISTS:
             path = path.rstrip()
-            if path.startswith("/"):
+            if not path:
+                continue
+            elif path.startswith("/"):
                 urls_queue.append(f"{url}{path}")
             else:
                 urls_queue.append(f"{url}/{path}")
     return urls_queue
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='URL scan')
+    parser = argparse.ArgumentParser(description='URL scan tool')
     parser.add_argument("target", help="URL target or file")
     args = parser.parse_args()
     if args.target:
@@ -190,7 +190,8 @@ if __name__ == "__main__":
                     URLS_QUEUE.extend(generate_urls(target.rstrip()))
         else:
             URLS_QUEUE = generate_urls(args.target)
-
+        # 日志记录时间
+        log(LOG_PATH, LOG_LOCK, f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         # 多线程扫描
         with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
             try:
