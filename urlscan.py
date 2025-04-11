@@ -1,3 +1,7 @@
+# coding=utf-8
+
+# python -m pip install requests
+
 import requests, urllib3, argparse, traceback, random, time, os, threading
 from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
 from concurrent import futures
