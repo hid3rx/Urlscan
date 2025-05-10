@@ -99,7 +99,7 @@ def run(url):
     try:
         for idx, url in enumerate(urls):
             response = requests.get(url, verify=False, headers=headers, 
-                allow_redirects=False, timeout=3, proxies=PROXIES if USE_PROXY else None)
+                allow_redirects=False, timeout=10, proxies=PROXIES if USE_PROXY else None)
             if response.status_code != 404:
                 output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
                 print(f"[+] {output}")
