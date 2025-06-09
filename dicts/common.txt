@@ -31,6 +31,8 @@
 /eureka
 /fckeditor
 /functionRouter
+/geoserver/web/
+/geoserver/wfs
 /graph
 /graphql
 /hystrix.stream 
@@ -40,6 +42,7 @@
 /jmx-console
 /jolokia
 /login
+/login.action
 /login.asp
 /login.aspx
 /login.do
