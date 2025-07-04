@@ -62,6 +62,7 @@
 /register.jsp
 /robots.txt
 /role/list
+/run
 /snapshots
 /src
 /swagger-ui.html
@@ -74,6 +75,7 @@
 /sysadmin.jsp
 /system
 /test.txt
+/toLogin
 /ueditor
 /upload
 /upload.asp
@@ -91,3 +93,4 @@
 /WebReport/ReportServer
 /webroot/decision/login
 /wp-admin
+/xxl-job-admin
