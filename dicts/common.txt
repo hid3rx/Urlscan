@@ -87,7 +87,9 @@
 /user/list
 /users/list
 /user/login
+/v1/api-docs
 /v2/api-docs
+/v3/api-docs
 /v2/keys
 /version
 /WebReport/ReportServer
