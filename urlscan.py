@@ -2,13 +2,25 @@
 
 # python -m pip install requests
 
-import requests, urllib3, argparse, traceback, random, time, os, threading
+import requests, urllib3, argparse, traceback, random, time, os, threading, logging
 from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
 from concurrent import futures
 from datetime import datetime
 
 # 禁用https警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 日志设置
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+fh = logging.FileHandler('log.txt')
+fh.setFormatter(logging.Formatter('%(message)s'))
+logger.addHandler(fh)
+
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('%(message)s'))
+logger.addHandler(ch)
 
 #
 # =================== [ 全局设置 ] ===================
@@ -56,19 +68,6 @@ for wordlists in WORDLISTS_PATH:
         os._exit(0)
 
 #
-# =================== [ 扫描日志 ] ===================
-#
-
-LOG_PATH = "log.txt"
-LOG_LOCK = threading.Lock() # 文件互斥锁
-
-# 写入日志，末尾的换行符需要自行处理
-def log(path: str, lock, text: str):
-    with lock:
-        with open(path, "a", encoding="utf-8") as fout:
-            fout.write(text)
-
-#
 # =================== [ 扫描函数 ] ===================
 #
 
@@ -101,9 +100,7 @@ def run(url):
             response = requests.get(url, verify=False, headers=headers, 
                 allow_redirects=False, timeout=10, proxies=PROXIES if USE_PROXY else None)
             if response.status_code != 404:
-                output = f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}"
-                print(f"[+] {output}")
-                log(LOG_PATH, LOG_LOCK, f"{output}\n")
+                logger.info(f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}")
             if idx == 0 and response.status_code != 403:
                 break
     except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
@@ -194,8 +191,10 @@ if __name__ == "__main__":
                     URLS_QUEUE.extend(generate_urls(target.rstrip()))
         else:
             URLS_QUEUE = generate_urls(args.target)
+
         # 日志记录时间
-        log(LOG_PATH, LOG_LOCK, f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        logger.info(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
         # 多线程扫描
         with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
             try:
