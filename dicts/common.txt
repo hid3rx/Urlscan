@@ -23,6 +23,7 @@
 /artemis-portal/artemis/env
 /config.json
 /console
+/dev-api
 /distv2/index.html
 /doc.html
 /druid/login.html
