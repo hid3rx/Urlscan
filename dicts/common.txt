@@ -97,3 +97,4 @@
 /webroot/decision/login
 /wp-admin
 /xxl-job-admin
+/Telerik.Web.UI.WebResource.axd?type=rau
