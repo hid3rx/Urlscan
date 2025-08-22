@@ -28,6 +28,7 @@
 /doc.html
 /druid/login.html
 /dwr
+/editor
 /env
 /eureka
 /fckeditor
@@ -50,6 +51,7 @@
 /login.htm
 /login.html
 /login.jsp
+/nacos
 /nacos/v1
 /net
 /phpmyadmin
@@ -63,6 +65,7 @@
 /register.jsp
 /robots.txt
 /role/list
+/roles/list
 /run
 /snapshots
 /src
@@ -75,6 +78,10 @@
 /sysadmin.html
 /sysadmin.jsp
 /system
+/sys/user/list
+/sys/users/list
+/sys/role/list
+/sys/roles/list
 /test.txt
 /toLogin
 /ueditor
