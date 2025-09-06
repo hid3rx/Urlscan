@@ -67,8 +67,10 @@
 /role/list
 /roles/list
 /run
+/siteserver
 /snapshots
 /src
+/ss-admin
 /swagger-ui.html
 /sysadmin
 /sysadmin.asp
