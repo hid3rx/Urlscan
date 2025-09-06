@@ -10,6 +10,7 @@
 /admin.jsp
 /adminer
 /admin/login.html
+/Application/Runtime/Logs
 /api
 /api/v1
 /api/v2
@@ -67,6 +68,7 @@
 /role/list
 /roles/list
 /run
+/Runtime/Logs/Home
 /siteserver
 /snapshots
 /src
