@@ -97,9 +97,14 @@
 /upload.html
 /upload.jsp
 /upms
+/user/get
+/user/get/1
 /user/list
-/users/list
 /user/login
+/users/get
+/users/get/1
+/users/list
+/users/login
 /v1/agent/self
 /v1/agent/service/register
 /v1/api-docs
