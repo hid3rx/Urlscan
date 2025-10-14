@@ -22,6 +22,9 @@
 /apisix/admin/user/login
 /apisix/plugin/jwt/sign?key=test-key
 /artemis-portal/artemis/env
+/bak
+/backup
+/center/api/session
 /config.json
 /console
 /dev-api
@@ -36,6 +39,7 @@
 /functionRouter
 /geoserver/web/
 /geoserver/wfs
+/getCorsFile?urlPath=file:///C:/
 /graph
 /graphql
 /hystrix.stream 
@@ -52,6 +56,7 @@
 /login.htm
 /login.html
 /login.jsp
+/maximo
 /nacos
 /nacos/v1
 /net
@@ -82,6 +87,7 @@
 /sysadmin.html
 /sysadmin.jsp
 /system
+/sysweb
 /sys/user/list
 /sys/users/list
 /sys/role/list
@@ -114,6 +120,7 @@
 /version
 /WebReport/ReportServer
 /webroot/decision/login
+/webroot/decision/system/info
 /wp-admin
 /xxl-job-admin
 /Telerik.Web.UI.WebResource.axd?type=rau
