@@ -9,7 +9,6 @@
 /.bashrc
 /.config
 /.swp
-/application.yml
 /error.log
 /access.log
 /bin.zip
@@ -26,3 +25,5 @@
 /@fs/etc/passwd?import&raw??
 /@fs/C://Windows/win.ini?import&raw??
 /lm/api/files;.css
+/index/api/setServerConfig?secret=035c73f7-bb6b-4889-a715-d9eb2d1925cc&api.apiDebug=0
+/?a=WKtwuea&c=2RVM&m=fv3C&s=ba5a
