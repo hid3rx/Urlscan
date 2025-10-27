@@ -58,14 +58,31 @@ PROXIES = {
     "https": "http://127.0.0.1:8083"
 }
 
+# 历史记录文件
+HISTORY_FILE = "history.txt"
+
+# 历史记录
+HISTORY = set()
+
 # 读取字典列表
 for wordlists in WORDLISTS_PATH:
     try:
         with open(wordlists, "r", encoding="utf-8") as f:
             WORDLISTS.extend(f.readlines())
     except Exception as e:
-        print(f"[x] Cannot open '{wordlists}' file {e}")
+        print(f"[x] Cannot read '{wordlists}' file {e}")
         os._exit(0)
+
+# 读取历史记录文件
+try:
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            HISTORY.add(line)
+except Exception as e:
+    print(f"[x] Cannot read '{HISTORY_FILE}' file {e}")
 
 #
 # =================== [ 扫描函数 ] ===================
@@ -90,9 +107,7 @@ def run(url):
     # 403 Bypass
     urls = [
         url,
-        url + ";",
-        url + ";.js",
-        url + "/..;/",
+        url + ";.js"
     ]
 
     try:
@@ -119,6 +134,11 @@ TASKS = set()
 def concurrent_run(executor):
     global TASKS
     for url in URLS_QUEUE:
+        # 判断是否重复
+        if url in HISTORY:
+            continue
+        else:
+            HISTORY.add(url)
         # 如果队列过长就等待
         if len(TASKS) >= THREADS:
             _, TASKS = futures.wait(TASKS, return_when=futures.FIRST_COMPLETED)
@@ -191,7 +211,7 @@ if __name__ == "__main__":
                     URLS_QUEUE.extend(generate_urls(target.rstrip()))
         else:
             URLS_QUEUE = generate_urls(args.target)
-
+        
         # 日志记录时间
         logger.info(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
@@ -204,5 +224,15 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 print("[!] Get Ctrl-C, wait for all threads exit.")
                 futures.wait(TASKS, return_when=futures.ALL_COMPLETED)
+        
+        # 保存历史文件
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                for line in HISTORY:
+                    f.write(line + "\n")
+        except Exception as e:
+            print(f"[x] Cannot write '{HISTORY_FILE}' file {e}")
+            os._exit(0)
+
     else:
         parser.print_help()
