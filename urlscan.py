@@ -1,108 +1,106 @@
 # coding=utf-8
 
-# python -m pip install requests
+# python -m pip install curl_cffi
 
-import requests, urllib3, argparse, traceback, random, time, os, threading, logging
-from requests.exceptions import ConnectTimeout, ConnectionError, ReadTimeout
+import argparse, traceback, random, time, os, threading
+from curl_cffi.requests.exceptions import ConnectionError, Timeout
+from urllib.parse import urlparse
 from concurrent import futures
+from curl_cffi import requests
 from datetime import datetime
-
-# 禁用https警告
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# 日志设置
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-fh = logging.FileHandler('log.txt')
-fh.setFormatter(logging.Formatter('%(message)s'))
-logger.addHandler(fh)
-
-ch = logging.StreamHandler()
-ch.setFormatter(logging.Formatter('%(message)s'))
-logger.addHandler(ch)
 
 #
 # =================== [ 全局设置 ] ===================
 #
 
-# 待扫描队列，由 generate_urls 函数生成
-URLS_QUEUE = []
+configs = \
+{
+    # 字典路径
+    "wordlists": [
+        "dicts/common.txt", # 常规路径扫描
+        "dicts/offensive.txt", # 进攻性路径扫描，可能会被WAF封禁
+    ],
 
-# 待扫描的URL路径，从 WORDLISTS_PATH 中读取，如：
-# [
-#     "/actuator",
-#     "/doc.html",
-#     "/swagger-ui.html"
-# ]
-WORDLISTS = []
+    # 超时时间，单位秒
+    "timeout": 10,
 
-# 字典路径，读取后储存到 WORDLISTS 中
-WORDLISTS_PATH = [
-    "dicts/common.txt", # 常规路径扫描
-    "dicts/offensive.txt", # 进攻性路径扫描，可能会被WAF封禁
-]
+    # 线程并发数
+    "threads": 10,
+    
+    # 每个线程发起请求后暂停时长，单位秒
+    "delay": 1,
 
-# 线程并发数
-THREADS = 10
+    # 排除响应码
+    "ignored_status_code": [404],
 
-# 每个线程发起请求后暂停时长，单位秒
-DELAY = 1
+    # 历史记录目录
+    "history": "history",
 
-# 是否使用代理
-USE_PROXY = False
+    # 扫描日志
+    "logfile": "log.txt",
 
-# 设置代理
-PROXIES = {
-    "http": "http://127.0.0.1:8083",
-    "https": "http://127.0.0.1:8083"
+    # 是否使用HEAD方法
+    "use_head_method": True,
+
+    # 是否使用代理
+    "use_proxy": False,
+
+    # 设置代理
+    "proxies": {
+        "http": "http://127.0.0.1:8080",
+        "https": "http://127.0.0.1:8080"
+    },
+
+    # 自定义headers
+    "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0",
+        "Connection": "close",
+    }
 }
 
-# 历史记录文件
-HISTORY_FILE = "history.txt"
+# 互斥锁
+locks = {
+    "log": threading.Lock(),
+    "history": threading.Lock()
+}
 
-# 历史记录
-HISTORY = set()
+#
+# =================== [ 功能函数 ] ===================
+#
 
-# 读取字典列表
-for wordlists in WORDLISTS_PATH:
+# 判断URL是否合法
+def is_valid_url(url):
     try:
-        with open(wordlists, "r", encoding="utf-8") as f:
-            WORDLISTS.extend(f.readlines())
-    except Exception as e:
-        print(f"[x] Cannot read '{wordlists}' file {e}")
-        os._exit(0)
+        parser = urlparse(url)
+        return all([parser.scheme, parser.netloc])
+    except Exception:
+        return False
 
-# 读取历史记录文件
-try:
-    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            HISTORY.add(line)
-except Exception as e:
-    print(f"[x] Cannot read '{HISTORY_FILE}' file {e}")
+# 日志输出
+def log(message: str):
+    with locks["log"]:
+        print(message)
+        with open(configs["logfile"], "a", encoding="utf-8") as fout:
+            fout.write(message + "\n")
 
 #
 # =================== [ 扫描函数 ] ===================
 #
 
-def run(url):
-    time.sleep(DELAY)
+def run(url, history, name):
+    time.sleep(configs["delay"])
 
-    # 伪造 XFF
     random_ip = ".".join(str(random.randint(0,255)) for _ in range(4))
-    headers = requests.utils.default_headers()
-    headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0",
-        "Connection": "close",
+    headers = {
+        **configs["headers"],
         "X-Forwarded-For": random_ip,
         "X-Originating-IP": random_ip,
         "X-Remote-IP": random_ip,
         "X-Remote-Addr": random_ip,
         "X-Real-IP": random_ip
-    })
+    }
+    method = "HEAD" if configs["use_head_method"] else "GET"
+    proxies = configs["proxies"] if configs["use_proxy"] else None
 
     # 403 Bypass
     urls = [
@@ -110,15 +108,18 @@ def run(url):
         url + ";.js"
     ]
 
+    session = requests.Session(impersonate="firefox133")
     try:
         for idx, url in enumerate(urls):
-            response = requests.get(url, verify=False, headers=headers, 
-                allow_redirects=False, timeout=10, proxies=PROXIES if USE_PROXY else None)
-            if response.status_code != 404:
-                logger.info(f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}")
+            response = session.request(method, url=url, 
+                verify=False, headers=headers, allow_redirects=False, timeout=configs["timeout"], proxies=proxies)
+            if response.status_code not in configs["ignored_status_code"]:
+                log(f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}")
             if idx == 0 and response.status_code != 403:
                 break
-    except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
+        with locks["history"]:
+            history[name].add(url)
+    except (ConnectionError, Timeout) as e:
         print(f"[x] {url}\tConnect error")
     except Exception as e:
         print(f"[x] {url}\tAn unknown error occurred: {e}")
@@ -128,49 +129,55 @@ def run(url):
 # =================== [ 启动多线程扫描 ] ===================
 #
 
-TASKS = set()
-
 # 并发运行爆破函数
-def concurrent_run(executor):
-    global TASKS
-    for url in URLS_QUEUE:
-        # 判断是否重复
-        if url in HISTORY:
-            continue
-        else:
-            HISTORY.add(url)
-        # 如果队列过长就等待
-        if len(TASKS) >= THREADS:
-            _, TASKS = futures.wait(TASKS, return_when=futures.FIRST_COMPLETED)
-        # 清除右边的换行
-        url = url.rstrip()
-        # 新建线程
-        t = executor.submit(run, url)
-        TASKS.add(t)
+def concurrent_run(executor, tasks, scans, history):
+    for name in scans.keys():
+        for url in scans[name]:
+            # 清除右边的换行
+            url = url.rstrip()
+            # 判断是否重复
+            with locks["history"]:
+                if url in history[name]:
+                    continue
+            # 如果队列过长就等待
+            if len(tasks) >= configs["threads"]:
+                _, tasks = futures.wait(tasks, return_when=futures.FIRST_COMPLETED)
+            # 新建线程
+            tasks.add(executor.submit(run, url, history, name))
 
 # 生成探测列表
-def generate_urls(target):
+def generate_urls(target, wordlist):
+    if not is_valid_url(target):
+        print(f"[!] Invalid url: {target}")
+        return []
+
     # https://example.com:8443/api/login 可拆解为两部分
     # 第一部分：https://example.com:8443
     # 第二部分：/api/login
 
-    # 提取第一部分，url = "https://example.com:8443"
-    parser = urllib3.util.parse_url(target.rstrip('/'))
-    if parser.scheme:
-        url = f"{parser.scheme}://{parser.host}"
-    else:
-        url = f"http://{parser.host}"
-    if parser.port:
-        url = url + f":{parser.port}"
+    # 提取第一部分，url_root = "https://example.com:8443"
+    parsed = urlparse(target.rstrip('/'))
 
-    # 提取第二部分，paths = ["", "/api", "/api/login"]
-    paths = []
-    if parser.path is None:
-        paths.append("")
+    if parsed.scheme:
+        url_root = f"{parsed.scheme}://{parsed.hostname}"
+        if parsed.port:
+            url_root = url_root + f":{parsed.port}"
     else:
-        path = parser.path.strip("/").split('/')
-        for i in range(len(path) + 1):
-            paths.append("/".join(path[0:i]))
+        url_root = f"http://{parsed.hostname}"
+        if parsed.port:
+            url_root = url_root + f":{parsed.port}"
+
+    # 提取第二部分，url_paths = ["", "api", "api/login"]
+    url_paths = [""]
+    if parsed.path is not None:
+        url_path = parsed.path.strip("/")
+        if '/' not in url_path:
+            if url_path != "":
+                url_paths.append(url_path)
+        else:
+            url_path = url_path.split('/')
+            for i in range(len(url_path)):
+                url_paths.append("/".join(url_path[0:i+1]))
 
     # 将第一部分和第二部分组合，urls = [
     #     "https://example.com:8443",
@@ -178,8 +185,8 @@ def generate_urls(target):
     #     "https://example.com:8443/api/login"
     # ]
     urls = []
-    for path in paths:
-        urls.append(f"{url}/{path}")
+    for path in url_paths:
+        urls.append(f"{url_root}/{path}".rstrip("/"))
 
     # 将组合结果再与字典拼接，urls_queue = [
     #     "https://example.com:8443/actuator",
@@ -188,8 +195,7 @@ def generate_urls(target):
     # ]
     urls_queue = []
     for url in urls:
-        url = url.rstrip("/")
-        for path in WORDLISTS:
+        for path in wordlist:
             path = path.rstrip()
             if not path:
                 continue
@@ -204,35 +210,105 @@ if __name__ == "__main__":
     parser.add_argument("target", help="URL target or file")
     args = parser.parse_args()
     if args.target:
-        # 生成探测列表
-        if os.path.exists(args.target):
-            with open(args.target, "r", encoding="utf-8") as f:
-                for target in f.readlines():
-                    URLS_QUEUE.extend(generate_urls(target.rstrip()))
-        else:
-            URLS_QUEUE = generate_urls(args.target)
+        # 读取字典列表
+        wordlist = set()
+        for path in configs["wordlists"]:
+            try:
+                with open(path, "r", encoding="utf-8") as fin:
+                    for line in fin:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        wordlist.add(line)
+            except Exception as e:
+                print(f"[x] Cannot read '{path}' wordlist file {e}")
+
+        # 探测列表
+        urls = set()
+        if os.path.exists(args.target): # 参数是文件
+            # 从文件中读取目标
+            with open(args.target, "r", encoding="utf-8") as fin:
+                for line in fin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if not is_valid_url(line):
+                        continue
+                    urls.add(line)
         
+        else: # 参数是URL
+            if not is_valid_url(args.target):
+                print(f"[x] {args.target} is not a valid url")
+                os._exit(0)
+            urls.add(args.target)
+
+        # 收集history文件
+        history = {}
+        if not os.path.exists(configs["history"]):
+            os.mkdir(configs["history"])
+        for url in urls:
+            # 计算url的name，http://127.0.0.1:8080 -> http_127.0.0.1_8080
+            parsed = urlparse(url)
+            scheme = parsed.scheme if parsed.scheme else "http"
+            if parsed.port:
+                name = f"{scheme}_{parsed.hostname}_{parsed.port}"
+            else:
+                name = f"{scheme}_{parsed.hostname}"
+            # 检查url的name，避免重复加载（一次扫描可以输入多个url，可能会出现重复的name）
+            if name in history:
+                continue
+            else:
+                history[name] = set()
+                file = os.path.join(configs["history"], name + ".txt")
+                if os.path.exists(file):
+                    try:
+                        with open(file, "r", encoding="utf-8") as fin:
+                            for line in fin:
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                history[name].add(line)
+                    except Exception as e:
+                        print(f"[x] Cannot read '{file}' file {e}")
+
+        # 生成扫描列表
+        scans = {}
+        for url in urls:
+            # 计算url的name，http://127.0.0.1:8080 -> http_127.0.0.1_8080
+            parsed = urlparse(url)
+            scheme = parsed.scheme if parsed.scheme else "http"
+            if parsed.port:
+                name = f"{scheme}_{parsed.hostname}_{parsed.port}"
+            else:
+                name = f"{scheme}_{parsed.hostname}"
+            # 检查url的name，避免前面的url被覆盖（一次扫描可以输入多个url，可能会出现重复的name）
+            if name not in scans:
+                scans[name] = generate_urls(url, wordlist)
+            else:
+                scans[name].extend(generate_urls(url, wordlist))
+
         # 日志记录时间
-        logger.info(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        log(f"\n# Begin at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         # 多线程扫描
-        with futures.ThreadPoolExecutor(max_workers=THREADS) as executor:
+        tasks = set()
+        with futures.ThreadPoolExecutor(max_workers=configs["threads"]) as executor:
             try:
-                concurrent_run(executor)
+                concurrent_run(executor, tasks, scans, history)
                 print("[!] Wait for all threads exit.")
-                futures.wait(TASKS, return_when=futures.ALL_COMPLETED)
+                futures.wait(tasks, return_when=futures.ALL_COMPLETED)
             except KeyboardInterrupt:
                 print("[!] Get Ctrl-C, wait for all threads exit.")
-                futures.wait(TASKS, return_when=futures.ALL_COMPLETED)
+                futures.wait(tasks, return_when=futures.ALL_COMPLETED)
         
         # 保存历史文件
-        try:
-            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-                for line in HISTORY:
-                    f.write(line + "\n")
-        except Exception as e:
-            print(f"[x] Cannot write '{HISTORY_FILE}' file {e}")
-            os._exit(0)
-
+        for name in history.keys():
+            file = os.path.join(configs["history"], name + ".txt")
+            try:
+                with open(file, "w", encoding="utf-8") as fin:
+                    for line in history[name]:
+                        fin.write(line + "\n")
+            except Exception as e:
+                print(f"[x] Cannot write '{file}' file {e}")
     else:
         parser.print_help()
