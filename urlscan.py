@@ -1,13 +1,11 @@
 # coding=utf-8
 
-# python -m pip install curl_cffi
-
-import argparse, traceback, random, time, os, threading
-from curl_cffi.requests.exceptions import ConnectionError, Timeout
-from urllib.parse import urlparse
+import argparse, os, random, threading, time, traceback
 from concurrent import futures
+from curl_cffi.requests.exceptions import ConnectionError, Timeout
 from curl_cffi import requests
 from datetime import datetime
+from urllib.parse import urlparse
 
 #
 # =================== [ 全局设置 ] ===================
