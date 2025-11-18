@@ -37,8 +37,8 @@ configs = \
     # 扫描日志
     "logfile": "log.txt",
 
-    # 是否使用HEAD方法
-    "use_head_method": True,
+    # 是否使用HEAD方法，HEAD方法看不到响应的长度
+    "use_head_method": False,
 
     # 是否使用代理
     "use_proxy": False,
