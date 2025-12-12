@@ -53,6 +53,11 @@ configs = \
     "headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0",
         "Connection": "close",
+    },
+
+    # 自定义cookies
+    "cookies": {
+        # "JSESSIONID": ""
     }
 }
 
@@ -97,6 +102,7 @@ def run(url, history, name):
         "X-Remote-Addr": random_ip,
         "X-Real-IP": random_ip
     }
+    cookies = configs["cookies"]
     method = "HEAD" if configs["use_head_method"] else "GET"
     proxies = configs["proxies"] if configs["use_proxy"] else None
 
@@ -110,7 +116,7 @@ def run(url, history, name):
     try:
         for idx, url in enumerate(urls):
             response = session.request(method, url=url, 
-                verify=False, headers=headers, allow_redirects=False, timeout=configs["timeout"], proxies=proxies)
+                verify=False, headers=headers, cookies=cookies, allow_redirects=False, timeout=configs["timeout"], proxies=proxies)
             if response.status_code not in configs["ignored_status_code"]:
                 log(f"code:{response.status_code}\tlen:{len(response.content)}\t\t{url}")
             if idx == 0 and response.status_code != 403:
